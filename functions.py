@@ -2,6 +2,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
+import seaborn as sns
+from sklearn.metrics import (
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    classification_report,
+)
+
+figure_colors_cmap = sns.color_palette("viridis", as_cmap=True)
 
 
 def check_if_superset(
@@ -119,6 +127,7 @@ def aggregate_bur(df):
             "STATUS_mean": ["mean"],
             "STATUS_std": ["mean"],
             "STATUS_max": ["mean"],
+            "STATUS_last": ["mean"],
             "CREDIT_ACTIVE_Closed": ["sum"],
             "CREDIT_ACTIVE_Active": ["sum"],
             "CREDIT_ACTIVE_Sold": ["sum"],
@@ -161,7 +170,18 @@ def aggregate_cash(df):
             "Has_overdue_def": ["sum"],
         }
     )
-    aggregates = clean_agg_columns(aggregates, "CASH")
+    PREFIX = "CASH"
+    aggregates = clean_agg_columns(aggregates, PREFIX)
+    active_statuses = df_copy[
+        (df_copy["MONTHS_BALANCE"] == -1)
+        & (df_copy["NAME_CONTRACT_STATUS"] == "Active")
+    ]
+    active_count = (
+        active_statuses.groupby("SK_ID_CURR")["SK_ID_PREV"]
+        .count()
+        .rename(f"{PREFIX}_Status_Active_count")
+    )
+    aggregates = aggregates.join(active_count)
     return aggregates
 
 
@@ -181,3 +201,102 @@ def aggregate_inst(df):
     )
     aggregates = clean_agg_columns(aggregates, "INST")
     return aggregates
+
+
+def aggregate_cred(df):
+    """Perform aggregations for the credit_card_balance table."""
+    df_copy = df.copy()
+    df_copy["Has_overdue"] = df_copy["SK_DPD"] > 0
+    df_copy["Has_overdue_def"] = df_copy["SK_DPD_DEF"] > 0
+    aggregates = df_copy.groupby("SK_ID_CURR").agg(
+        {
+            "SK_ID_PREV": ["nunique", "count"],
+            "SK_DPD": ["mean", "max"],
+            "Has_overdue": ["sum"],
+            "SK_DPD_DEF": ["mean", "max"],
+            "Has_overdue_def": ["sum"],
+            "AMT_BALANCE": ["median", "max"],
+            "AMT_CREDIT_LIMIT_ACTUAL": ["median", "max"],
+            "AMT_DRAWINGS_ATM_CURRENT": ["min", "max", "mean"],
+            "AMT_DRAWINGS_CURRENT": ["min", "max", "mean"],
+            "AMT_DRAWINGS_OTHER_CURRENT": ["mean", "max"],
+            "AMT_DRAWINGS_POS_CURRENT": ["mean", "max"],
+            "AMT_INST_MIN_REGULARITY": ["mean", "max"],
+            "AMT_PAYMENT_CURRENT": ["mean", "max"],
+            "AMT_PAYMENT_TOTAL_CURRENT": ["mean", "max"],
+            "AMT_RECEIVABLE_PRINCIPAL": ["min", "max", "mean"],
+            "AMT_RECIVABLE": ["min", "max", "mean"],
+            "AMT_TOTAL_RECEIVABLE": ["min", "max", "mean"],
+            "CNT_DRAWINGS_ATM_CURRENT": ["mean", "max"],
+            "CNT_DRAWINGS_CURRENT": ["mean", "max"],
+            "CNT_DRAWINGS_OTHER_CURRENT": ["mean", "max"],
+            "CNT_DRAWINGS_POS_CURRENT": ["mean", "max"],
+        }
+    )
+    PREFIX = "CRED"
+    aggregates = clean_agg_columns(aggregates, PREFIX)
+    active_statuses = df_copy[
+        (df_copy["MONTHS_BALANCE"] == -1)
+        & (df_copy["NAME_CONTRACT_STATUS"] == "Active")
+    ]
+    active_count = (
+        active_statuses.groupby("SK_ID_CURR")["SK_ID_PREV"]
+        .count()
+        .rename(f"{PREFIX}_Status_Active_count")
+    )
+    aggregates = aggregates.join(active_count)
+    return aggregates
+
+
+def norm_plot(
+    df: pd.DataFrame,
+    x: str,
+    hue: str,
+    ax: list[plt.Axes],
+    *args,
+    **kwargs,
+):
+    """Create a figure of two plots. First plot shows normalised counts and the second is just a countplot."""
+    hue_percent = f"{hue}, percent"
+    df_counts = df.groupby(x)[hue].value_counts(normalize=True)
+    df_counts = df_counts.mul(100).rename(hue_percent).reset_index()
+
+    sns.barplot(
+        y=df_counts[x],
+        x=df_counts[hue_percent],
+        hue=df_counts[hue],
+        ax=ax[0],
+        orient="h",
+        *args,
+        **kwargs,
+    )
+    mean_positive_proportion = df_counts[df_counts[hue] == 1][hue_percent].mean()
+    ax[0].axvline(
+        mean_positive_proportion,
+        color="red",
+        alpha=0.5,
+        ls="--",
+        label="mean of 1",
+    )
+    ax[0].legend()
+
+    sns.countplot(
+        y=df[x],
+        stat="percent",
+        ax=ax[1],
+        *args,
+        **kwargs,
+    )
+    sns.despine(ax=ax[0])
+    sns.despine(ax=ax[1])
+    add_labels(ax=ax[1], fmt="%1.1f%%")
+    ax[0].set_xlabel("Proportion in Specific Group")
+    ax[0].set_ylabel("")
+    ax[1].set_xlabel("Percent of the Whole Dataset")
+
+
+def plot_metrics(y_valid, y_pred) -> None:
+    conf_mx = confusion_matrix(y_valid, y_pred)
+    disp_rf = ConfusionMatrixDisplay(confusion_matrix=conf_mx)
+    disp_rf.plot(cmap=figure_colors_cmap)
+    print(classification_report(y_valid, y_pred, zero_division=0))
