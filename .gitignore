@@ -1,4 +1,7 @@
 venv/
+pycaret_env/
 data/
+*.log
 
 __py*
+tables_look.ipynb

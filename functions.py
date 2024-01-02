@@ -14,8 +14,23 @@ import warnings
 from sklearn.model_selection import train_test_split
 import xgboost as xgb
 import shap
+import os
 
 figure_colors_cmap = sns.color_palette("viridis", as_cmap=True)
+
+
+def csv_to_parquet(path: str) -> tuple[str, str]:
+    """Transforms csv to parquet, returns read dataframe.
+
+    Parameters
+    ----------
+    path : str
+        Relative path to the csv file.
+    """
+    path_parquet = os.path.splitext(path)[0] + ".parquet"
+    df = pd.read_csv(path, engine="pyarrow")
+    df.to_parquet(path_parquet, engine="pyarrow")
+    return df
 
 
 def check_if_superset(
@@ -302,6 +317,46 @@ def aggregate_prev(df):
     return aggregates
 
 
+def norm_count_plot(
+    df: pd.DataFrame,
+    x: str,
+    hue: str,
+    ax: plt.Axes,
+    pos_prop: bool = False,
+    *args,
+    **kwargs,
+):
+    """Create a normalised counts figure."""
+    hue_percent = f"{hue}, percent"
+    df_counts = df.groupby(x)[hue].value_counts(normalize=True)
+    df_counts = df_counts.mul(100).rename(hue_percent).reset_index()
+
+    sns.barplot(
+        y=df_counts[x],
+        x=df_counts[hue_percent],
+        hue=df_counts[hue],
+        ax=ax,
+        orient="h",
+        *args,
+        **kwargs,
+    )
+    if pos_prop:
+        total_rows, _ = df.shape
+        pos_rows, _ = df[df[hue] == 1].shape
+        mean_positive_proportion = pos_rows / total_rows * 100
+        ax.axvline(
+            mean_positive_proportion,
+            color="red",
+            alpha=0.5,
+            ls="--",
+            label="mean of 1",
+        )
+        ax.legend()
+    sns.despine(ax=ax)
+    ax.set_xlabel("Percent of Specific Group")
+    ax.set_ylabel("")
+
+
 def norm_plot(
     df: pd.DataFrame,
     x: str,
@@ -311,28 +366,15 @@ def norm_plot(
     **kwargs,
 ):
     """Create a figure of two plots. First plot shows normalised counts and the second is just a countplot."""
-    hue_percent = f"{hue}, percent"
-    df_counts = df.groupby(x)[hue].value_counts(normalize=True)
-    df_counts = df_counts.mul(100).rename(hue_percent).reset_index()
-
-    sns.barplot(
-        y=df_counts[x],
-        x=df_counts[hue_percent],
-        hue=df_counts[hue],
-        ax=ax[0],
-        orient="h",
+    norm_count_plot(
+        df,
+        x,
+        hue,
+        ax[0],
+        pos_prop=True,
         *args,
         **kwargs,
     )
-    mean_positive_proportion = df_counts[df_counts[hue] == 1][hue_percent].mean()
-    ax[0].axvline(
-        mean_positive_proportion,
-        color="red",
-        alpha=0.5,
-        ls="--",
-        label="mean of 1",
-    )
-    ax[0].legend()
 
     sns.countplot(
         y=df[x],
@@ -341,23 +383,23 @@ def norm_plot(
         *args,
         **kwargs,
     )
-    sns.despine(ax=ax[0])
+
     sns.despine(ax=ax[1])
     add_labels(ax=ax[1], fmt="%1.1f%%")
-    ax[0].set_xlabel("Proportion in Specific Group")
-    ax[0].set_ylabel("")
     ax[1].set_xlabel("Percent of the Whole Dataset")
 
 
-def preprocess_test_train_TARGET(df: pd.DataFrame, preprocessor) -> tuple[pd.DataFrame]:
+def preprocess_test_train(
+    df: pd.DataFrame, preprocessor, stratify: str = "TARGET"
+) -> tuple[pd.DataFrame]:
     """Split the dataframe into X/y and train/test, transform X with the preprocessor."""
     df_train, df_valid = train_test_split(
-        df, test_size=0.2, stratify=df["TARGET"], random_state=42
+        df, test_size=0.2, stratify=df[stratify], random_state=42
     )
-    X_train = df_train.drop(columns="TARGET")
-    y_train = df_train["TARGET"]
-    X_valid = df_valid.drop(columns="TARGET")
-    y_valid = df_valid["TARGET"]
+    X_train = df_train.drop(columns=stratify)
+    y_train = df_train[stratify]
+    X_valid = df_valid.drop(columns=stratify)
+    y_valid = df_valid[stratify]
 
     X_train_tf = preprocessor.fit_transform(X_train, y_train)
     X_valid_tf = preprocessor.transform(X_valid)
@@ -365,9 +407,11 @@ def preprocess_test_train_TARGET(df: pd.DataFrame, preprocessor) -> tuple[pd.Dat
     return X_train_tf, y_train, X_valid_tf, y_valid
 
 
-def report_classification_metrics(y_truth: pd.DataFrame, y_pred: pd.DataFrame) -> None:
+def report_classification_metrics(
+    y_truth: pd.DataFrame, y_pred: pd.DataFrame, *args, **kwargs
+) -> None:
     """Print classification metrics for the given truth and prediction lists"""
-    conf_mx = confusion_matrix(y_truth, y_pred)
+    conf_mx = confusion_matrix(y_truth, y_pred, *args, **kwargs)
     disp_rf = ConfusionMatrixDisplay(confusion_matrix=conf_mx)
     disp_rf.plot(cmap=figure_colors_cmap)
     print(classification_report(y_truth, y_pred, zero_division=0))
