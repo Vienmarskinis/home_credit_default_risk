@@ -1,7 +1,9 @@
 venv/
 pycaret_env/
 data/
+models/
 *.log
 
 __py*
 tables_look.ipynb
+app_TARGET/
