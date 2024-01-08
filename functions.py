@@ -269,7 +269,7 @@ def aggregate_cred(df):
     return aggregates
 
 
-def aggregate_prev(df):
+def aggregate_prev(df: pd.DataFrame) -> pd.DataFrame:
     """Perform aggregations for the previous_application table."""
     df_copy = df.copy()
     oh_encoder = OneHotEncoder(sparse_output=False).set_output(transform="pandas")
@@ -417,7 +417,7 @@ def report_classification_metrics(
     print(classification_report(y_truth, y_pred, zero_division=0))
 
 
-def report_xgb_metrics(model, X: pd.DataFrame, y: pd.DataFrame, name: str):
+def report_xgb_metrics(model, X: pd.DataFrame, y: pd.DataFrame, name: str) -> None:
     """Print XGB classification metrics: log loss and PRC"""
     print(f"log loss: {model.best_score:1.3f}")
     disp = PrecisionRecallDisplay.from_estimator(
@@ -429,7 +429,7 @@ def report_xgb_metrics(model, X: pd.DataFrame, y: pd.DataFrame, name: str):
     sns.despine()
 
 
-def get_shap_importance_df(X: pd.DataFrame, shap_values):
+def get_shap_importance_df(X: pd.DataFrame, shap_values) -> pd.DataFrame:
     """Create a shap feature importance dataframe"""
     feature_names = X.columns
     shap_df = pd.DataFrame(shap_values, columns=feature_names)
@@ -572,7 +572,17 @@ def prepare_data_TARGET_20(
     return df_merged
 
 
-def calculate_profit_TARGET(y_truth, y_pred):
+def calculate_profit_TARGET(y_truth, y_pred) -> float:
+    """Calculate the profit of a model by applying a profit to each element of the confusion matrix.
+
+    Parameters
+    ----------
+    y_truth : array-like of shape (n_samples,)
+        Ground truth (correct) target values.
+
+    y_pred : array-like of shape (n_samples,)
+        Estimated targets as returned by a classifier.
+    """
     # Define Income matrix
     I00 = 0.2
     I11 = 0
