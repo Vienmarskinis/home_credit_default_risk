@@ -1,6 +1,4 @@
-# Module 3: Machine Learning
-
-## Capstone Project - Home Credit Default Risk Kaggle Competition
+## Home Credit Default Risk Kaggle Competition
 
 ### Author: Tomas Balsevičius
 
