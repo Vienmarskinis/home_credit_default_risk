@@ -24,7 +24,10 @@ pip install -r requirements_pycaret.txt
 ## Introduction
 For the full project introduction, please refer to step1 notebook.
 
-I was tasked with the hypothetical situation described in 341.ipynb - it's an unmodified file provided by Turing College. The main takeaways from the problem is that I am given a loan company's dataset consisting of multiple linked tables. I am free to create my own project structure and several proof-of-concept models that I could offer to any loan companies. 
+I was tasked with the hypothetical situation where I would need to employ a startup-like mindset. I am supposed to investigate the dataset at hand, create a project plan and try to create several proof-of-concept models that I could later offer to any loan companies that would be interested in solving the business problems I identified.
+
+### Dataset
+The dataset is taken from a [Kaggle competition](https://www.kaggle.com/c/home-credit-default-risk/data). It is a relational database, where the application table is linked to downstream tables through SK_ID_CURR and previous_application table - through SK_ID_PREV. Application table contains information about the application at the time of applying. Previous application table contains various information: general info about the application, was it refused or approved, current status etc. Other tables extend on these two tables, describing the loans, their monthly statuses and installments.
 
 ### Project Structure
 This is the actual project structure that serves as the actual documentation of the project.
